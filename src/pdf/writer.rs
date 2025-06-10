@@ -1,6 +1,6 @@
-// src/pdf/writer.rs
 use crate::css::styles::Color;
 use crate::layout::box_model::{BoxContent, LayoutBox};
+use crate::image::decoder::decode_image;
 
 struct LinkInfo {
     x1: f32,
@@ -138,8 +138,13 @@ fn write_box(b: &LayoutBox, stream: &mut Vec<u8>, links: &mut Vec<LinkInfo>) {
                 .as_bytes(),
             );
         }
-        BoxContent::Image(_path) => {
-            // Éléments conteneurs : contenu dans les enfants
+        BoxContent::Image(path) => {
+            if let Some(img) = decode_image(path) {
+                stream.extend(format!("q\n{} 0 0 {} {} {} cm\n", b.width, b.height, b.x, y_rect).as_bytes());
+                stream.extend(format!("BI /W {} /H {} /CS /RGB /BPC 8 ID\n", img.width, img.height).as_bytes());
+                stream.extend(&img.data);
+                stream.extend(b"\nEI\nQ\n");
+            }
         }
         BoxContent::Element(_) => {}
     }

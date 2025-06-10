@@ -11,3 +11,4 @@ categories = ["text-processing", "rendering"]
 exclude = ["input.html", "output/*"]
 
 [dependencies]
+image = "0.25.6"

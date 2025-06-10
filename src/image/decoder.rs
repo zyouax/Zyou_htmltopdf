@@ -1,4 +1,4 @@
-use std::fs;
+use image::io::Reader as ImageReader;
 
 #[derive(Debug)]
 pub struct Image {
@@ -8,12 +8,12 @@ pub struct Image {
 }
 
 pub fn decode_image(path: &str) -> Option<Image> {
-    // Simulation de décodage (PNG/JPEG simplifié)
-    // Dans une implémentation réelle, utiliser un décodeur PNG/JPEG maison
-    let data = fs::read(path).ok()?;
+    let reader = ImageReader::open(path).ok()?;
+    let img = reader.decode().ok()?;
+    let rgb = img.to_rgb8();
     Some(Image {
-        width: 100, // Placeholder
-        height: 100,
-        data,
+        width: rgb.width(),
+        height: rgb.height(),
+        data: rgb.into_raw(),
     })
 }
