@@ -124,7 +124,7 @@ Voir le fichier `LICENSE` pour plus de détails.
 ## Contributeurs
 [Zyouax](https://github.com/zyouax) – Créateur, développeur principal
 
-Ouvert aux PR et suggestions ! Propose une idée via [issues](https://github.com/zyouax/zyou_htmltopdf/issues)
+Ouvert aux PR et suggestions ! Propose une idée via [issues](https://github.com/zyouax/zyou_htmltopdf/issues/1)
 
 ## 🤝 Contributions bienvenues
 
