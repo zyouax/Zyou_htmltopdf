@@ -16,5 +16,5 @@ pub struct LayoutBox {
 pub enum BoxContent {
     Text(String),
     Element(String),
-    Image(String), // Chemin de l'image
+    Image(String),
 }

@@ -3,7 +3,7 @@ name = "zyou_htmltopdf"
 version = "0.1.0"
 edition = "2024"
 authors = ["Alexandre Ducros <Alexandre.ducros@aquioi.com>"]
-description = "A Rust library to convert HTML to PDF without external dependencies"
+description = "A Rust library to convert HTML to PDF"
 license = "MIT"
 repository = "https://github.com/zyouax/zyou_htmltopdf"
 keywords = ["html", "pdf", "converter", "rust", "zyouax"]
@@ -12,3 +12,4 @@ exclude = ["input.html", "output/*"]
 
 [dependencies]
 image = "0.25.6"
+font-kit = "0.14.3"

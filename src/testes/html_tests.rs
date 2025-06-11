@@ -9,10 +9,14 @@ mod tests {
         let root = dom.borrow();
         assert_eq!(root.children.len(), 1);
         let first = root.children[0].borrow();
-        assert_eq!(first.node_type, crate::html::dom::NodeType::Element("div".to_string()));
+        assert_eq!(
+            first.node_type,
+            crate::html::dom::NodeType::Element("div".to_string())
+        );
         assert_eq!(first.children.len(), 2);
     }
-     #[test]
+
+    #[test]
     fn test_single_quoted_attr() {
         let html = "<img src='img.png' alt='test'/>";
         let dom = parse_html(html);

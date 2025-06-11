@@ -7,7 +7,6 @@ pub mod image;
 #[cfg(test)]
 mod testes;
 
-
 pub use html::parser::parse_html;
 pub use css::parser::{collect_stylesheets, parse_stylesheet};
 pub use layout::engine::compute_layout;

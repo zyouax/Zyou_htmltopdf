@@ -1,5 +1,13 @@
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Position {
+    #[default]
+    Static,
+    Relative,
+    Absolute,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Style {
     pub display: Display,
@@ -12,9 +20,12 @@ pub struct Style {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub font_family: Option<String>,
+    pub position: Position,
+    pub top: Option<f32>,
+    pub left: Option<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)] // Ajout de PartialEq
 pub enum Display {
     Block,
     Inline,

@@ -1,4 +1,4 @@
-use super::styles::{Color, Display, Sides, Style, Stylesheet};
+use super::styles::{Color, Display, Position, Sides, Style, Stylesheet};
 use crate::html::dom::{Node, NodeType};
 
 pub fn parse_css(
@@ -29,7 +29,6 @@ pub fn parse_css(
                     }
                 }
             }
-            // id selector
             if let Some(id) = node.get_attribute("id") {
                 if let Some(s) = sheet.get(&format!("#{}", id)) {
                     merge_styles(&mut style, s);
@@ -37,13 +36,11 @@ pub fn parse_css(
             }
         }
 
-        // Appliquer les styles par défaut selon la balise
         match tag.as_str() {
             "img" | "span" | "a" | "strong" | "em" | "b" | "i" | "u" | "small" | "abbr"
             | "code" | "kbd" | "mark" | "s" | "sub" | "sup" | "var" | "time" | "cite" | "q" => {
                 style.display = Display::InlineBlock;
             }
-
             "p" | "div" | "section" | "article" | "aside" | "main" | "nav" | "header"
             | "footer" | "address" => {
                 style.display = Display::Block;
@@ -54,7 +51,6 @@ pub fn parse_css(
                     right: 0.0,
                 };
             }
-
             "h1" => {
                 style.display = Display::Block;
                 style.font_size = 32.0;
@@ -91,7 +87,6 @@ pub fn parse_css(
                 style.display = Display::Block;
                 style.font_size = 16.0;
             }
-
             "form" => {
                 style.display = Display::Block;
                 style.margin = Sides {
@@ -101,7 +96,6 @@ pub fn parse_css(
                     right: 0.0,
                 };
             }
-
             "ul" | "ol" => {
                 style.display = Display::Block;
                 style.margin = Sides {
@@ -120,7 +114,6 @@ pub fn parse_css(
                     right: 0.0,
                 };
             }
-
             "iframe" => {
                 style.display = Display::Block;
                 style.margin = Sides {
@@ -130,7 +123,6 @@ pub fn parse_css(
                     right: 0.0,
                 };
             }
-
             "table" => {
                 style.display = Display::Block;
                 style.margin = Sides::default();
@@ -153,8 +145,6 @@ pub fn parse_css(
                     right: 1.0,
                 };
             }
-
-            // Forms (basic)
             "input" | "label" | "textarea" | "select" | "option" | "button" => {
                 style.display = Display::InlineBlock;
                 style.margin = Sides {
@@ -164,8 +154,6 @@ pub fn parse_css(
                     right: 2.0,
                 };
             }
-
-            // Media
             "video" | "audio" | "canvas" => {
                 style.display = Display::Block;
                 style.margin = Sides {
@@ -175,7 +163,6 @@ pub fn parse_css(
                     right: 0.0,
                 };
             }
-
             _ => {}
         }
     }
@@ -199,7 +186,6 @@ pub fn parse_css(
     style
 }
 
-/// Parse a stylesheet string into a map of selector -> Style
 pub fn parse_stylesheet(css: &str) -> Stylesheet {
     let mut sheet = Stylesheet::new();
     for rule in css.split('}') {
@@ -216,7 +202,6 @@ pub fn parse_stylesheet(css: &str) -> Stylesheet {
     sheet
 }
 
-/// Recursively collect stylesheets from <style> and <link rel="stylesheet"> tags
 pub fn collect_stylesheets(node: &Node) -> Stylesheet {
     fn collect(node: &Node, sheet: &mut Stylesheet) {
         if let NodeType::Element(tag) = &node.node_type {
@@ -275,6 +260,9 @@ fn merge_styles(base: &mut Style, other: &Style) {
     if other.font_family.is_some() {
         base.font_family = other.font_family.clone();
     }
+    base.position = other.position.clone();
+    base.top = other.top;
+    base.left = other.left;
 }
 
 fn apply_declarations(css: &str, style: &mut Style) {
@@ -310,6 +298,15 @@ fn apply_declarations(css: &str, style: &mut Style) {
             "background" | "background-color" => style.background = Some(parse_color(value)),
             "width" => style.width = parse_unit(value),
             "height" => style.height = parse_unit(value),
+            "position" => {
+                style.position = match value {
+                    "relative" => Position::Relative,
+                    "absolute" => Position::Absolute,
+                    _ => Position::Static,
+                };
+            }
+            "top" => style.top = parse_unit(value),
+            "left" => style.left = parse_unit(value),
             _ => {}
         }
     }
@@ -357,7 +354,7 @@ fn parse_unit(value: &str) -> Option<f32> {
 }
 
 fn parse_color(value: &str) -> Color {
-     if value.starts_with('#') {
+    if value.starts_with('#') {
         if value.len() == 7 {
             if let (Ok(r), Ok(g), Ok(b)) = (
                 u8::from_str_radix(&value[1..3], 16),

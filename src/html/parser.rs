@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 pub type NodeRef = Rc<RefCell<Node>>;
 
-/// Parse un document HTML brut en un arbre DOM
 pub fn parse_html(html: &str) -> NodeRef {
     let root = Rc::new(RefCell::new(Node {
         node_type: NodeType::Element("html".to_string()),
@@ -20,13 +19,10 @@ pub fn parse_html(html: &str) -> NodeRef {
         match c {
             '<' => {
                 flush_text_buffer(&mut buffer, stack.last());
-
-                // Gestion des commentaires <!-- -->
                 if chars.peek() == Some(&'!') {
                     let mut it = chars.clone();
                     it.next();
                     if it.next() == Some('-') && it.next() == Some('-') {
-                        // Consommer '!-' '-'
                         chars.next();
                         chars.next();
                         chars.next();
@@ -51,7 +47,7 @@ pub fn parse_html(html: &str) -> NodeRef {
                 }
 
                 if chars.peek() == Some(&'/') {
-                    chars.next(); // Skip '/'
+                    chars.next();
                     let mut tag = String::new();
                     while let Some(ch) = chars.next() {
                         if ch == '>' {
@@ -59,7 +55,7 @@ pub fn parse_html(html: &str) -> NodeRef {
                         }
                         tag.push(ch);
                     }
-                    stack.pop(); // Ferme la balise
+                    stack.pop();
                 } else {
                     let (tag, attributes, self_closing) = parse_tag(&mut chars);
                     let node = Rc::new(RefCell::new(Node {
@@ -85,7 +81,6 @@ pub fn parse_html(html: &str) -> NodeRef {
     root
 }
 
-/// Ajoute le texte en attente comme nœud Text dans le DOM
 fn flush_text_buffer(buffer: &mut String, parent: Option<&NodeRef>) {
     let text = decode_entities(buffer.trim());
     if !text.is_empty() {
@@ -100,7 +95,6 @@ fn flush_text_buffer(buffer: &mut String, parent: Option<&NodeRef>) {
     buffer.clear();
 }
 
-/// Parse une balise HTML ouvrante : tag, attributs, fermeture
 fn parse_tag<I>(chars: &mut std::iter::Peekable<I>) -> (String, Vec<(String, String)>, bool)
 where
     I: Iterator<Item = char> + Clone,
@@ -109,7 +103,6 @@ where
     let mut attributes = vec![];
     let mut self_closing = false;
 
-    // Lire le nom de la balise
     while let Some(&c) = chars.peek() {
         if c.is_whitespace() || c == '/' || c == '>' {
             break;
@@ -118,9 +111,7 @@ where
         chars.next();
     }
 
-    // Lecture des attributs
     loop {
-        // Ignorer les espaces
         while let Some(&c) = chars.peek() {
             if c.is_whitespace() {
                 chars.next();
@@ -146,8 +137,6 @@ where
             }
             Some(_) => {
                 let mut name = String::new();
-
-                // Lire le nom de l’attribut
                 while let Some(&c) = chars.peek() {
                     if c == '=' || c.is_whitespace() || c == '>' {
                         break;
@@ -156,7 +145,6 @@ where
                     chars.next();
                 }
 
-                // Ignorer les espaces avant '='
                 while let Some(&c) = chars.peek() {
                     if c.is_whitespace() {
                         chars.next();
@@ -166,11 +154,8 @@ where
                 }
 
                 let mut value = String::new();
-
                 if chars.peek() == Some(&'=') {
-                    chars.next(); // skip '='
-
-                    // Espaces après =
+                    chars.next();
                     while let Some(&c) = chars.peek() {
                         if c.is_whitespace() {
                             chars.next();
@@ -181,7 +166,7 @@ where
 
                     if let Some(&quote) = chars.peek() {
                         if quote == '"' || quote == '\'' {
-                            chars.next(); // skip quote
+                            chars.next();
                             while let Some(ch) = chars.next() {
                                 if ch == quote {
                                     break;
@@ -209,7 +194,6 @@ where
     (tag.trim().to_string(), attributes, self_closing)
 }
 
-/// Liste des balises HTML auto-fermantes
 fn is_self_closing(tag: &str) -> bool {
     matches!(
         tag.to_ascii_lowercase().as_str(),
@@ -218,7 +202,6 @@ fn is_self_closing(tag: &str) -> bool {
     )
 }
 
-/// Décodage des entités HTML
 fn decode_entities(text: &str) -> String {
     let mut result = String::new();
     let mut chars = text.chars().peekable();

@@ -1,6 +1,6 @@
 use super::box_model::{BoxContent, LayoutBox};
 use crate::css::parser::parse_css;
-use crate::css::styles::{Display, Style, Stylesheet};
+use crate::css::styles::{Display, Position, Style, Stylesheet};
 use crate::html::dom::{Node, NodeType};
 
 pub fn compute_layout(
@@ -9,7 +9,6 @@ pub fn compute_layout(
     page_height: f32,
     sheet: Option<&Stylesheet>,
 ) -> LayoutBox {
-    // Créer la boîte racine
     let root_style = parse_css(dom, sheet, None, None);
     let mut root = LayoutBox {
         x: 0.0,
@@ -49,7 +48,6 @@ fn layout_children(
     let mut x_inline = 0.0;
     for child_rc in &node.children {
         let child = child_rc.borrow();
-        // Parser les styles CSS du nœud enfant
         if let NodeType::Element(tag) = &child.node_type {
             if tag == "style" || tag == "link" {
                 continue;
@@ -59,7 +57,6 @@ fn layout_children(
         let mut child_box = LayoutBox {
             x: 0.0,
             y: 0.0,
-            // Largeur par défaut : page_width moins les marges
             width: style
                 .width
                 .unwrap_or(available_width - style.margin.left - style.margin.right),
@@ -78,7 +75,6 @@ fn layout_children(
                 NodeType::Text(t) => BoxContent::Text(t.clone()),
                 NodeType::Element(tag) => {
                     if tag == "img" {
-                        // Gérer les images via l'attribut src
                         BoxContent::Image(child.get_attribute("src").unwrap_or("").to_string())
                     } else {
                         BoxContent::Element(tag.clone())
@@ -89,20 +85,37 @@ fn layout_children(
             children: vec![],
         };
 
-        // Positionner la boîte selon le type d'affichage (block ou inline)
-        match style.display {
-            Display::Block => {
-                child_box.x = start_x + style.margin.left;
-                child_box.y = y_offset + style.margin.top;
-                y_offset += child_box.height + style.margin.top + style.margin.bottom;
-                x_inline = 0.0; // Réinitialiser pour les blocs
+        match style.position {
+            Position::Absolute => {
+                child_box.x = style.left.unwrap_or(0.0) + style.margin.left;
+                child_box.y = style.top.unwrap_or(0.0) + style.margin.top;
             }
-            Display::Inline | Display::InlineBlock => {
-                child_box.x = start_x + x_inline + style.margin.left;
-                child_box.y = y_offset + style.margin.top;
-                x_inline += child_box.width + style.margin.left + style.margin.right;
+            Position::Relative => {
+                child_box.x = start_x + x_inline + style.margin.left + style.left.unwrap_or(0.0);
+                child_box.y = y_offset + style.margin.top + style.top.unwrap_or(0.0);
+                if style.display == Display::Block {
+                    y_offset += child_box.height + style.margin.top + style.margin.bottom;
+                    x_inline = 0.0;
+                } else {
+                    x_inline += child_box.width + style.margin.left + style.margin.right;
+                }
             }
-            Display::None => continue,
+            Position::Static => {
+                match style.display {
+                    Display::Block => {
+                        child_box.x = start_x + style.margin.left;
+                        child_box.y = y_offset + style.margin.top;
+                        y_offset += child_box.height + style.margin.top + style.margin.bottom;
+                        x_inline = 0.0;
+                    }
+                    Display::Inline | Display::InlineBlock => {
+                        child_box.x = start_x + x_inline + style.margin.left;
+                        child_box.y = y_offset + style.margin.top;
+                        x_inline += child_box.width + style.margin.left + style.margin.right;
+                    }
+                    Display::None => continue,
+                }
+            }
         }
 
         if !child.children.is_empty() {
