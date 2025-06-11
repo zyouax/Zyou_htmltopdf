@@ -357,13 +357,37 @@ fn parse_unit(value: &str) -> Option<f32> {
 }
 
 fn parse_color(value: &str) -> Color {
-    if value.starts_with('#') && value.len() == 7 {
-        if let (Ok(r), Ok(g), Ok(b)) = (
-            u8::from_str_radix(&value[1..3], 16),
-            u8::from_str_radix(&value[3..5], 16),
-            u8::from_str_radix(&value[5..7], 16),
-        ) {
-            return Color { r, g, b };
+     if value.starts_with('#') {
+        if value.len() == 7 {
+            if let (Ok(r), Ok(g), Ok(b)) = (
+                u8::from_str_radix(&value[1..3], 16),
+                u8::from_str_radix(&value[3..5], 16),
+                u8::from_str_radix(&value[5..7], 16),
+            ) {
+                return Color { r, g, b, a: 1.0 };
+            }
+        } else if value.len() == 9 {
+            if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                u8::from_str_radix(&value[1..3], 16),
+                u8::from_str_radix(&value[3..5], 16),
+                u8::from_str_radix(&value[5..7], 16),
+                u8::from_str_radix(&value[7..9], 16),
+            ) {
+                return Color { r, g, b, a: a as f32 / 255.0 };
+            }
+        }
+    } else if value.starts_with("rgba(") && value.ends_with(')') {
+        let inner = &value[5..value.len() - 1];
+        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        if parts.len() == 4 {
+            if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                parts[0].parse::<u8>(),
+                parts[1].parse::<u8>(),
+                parts[2].parse::<u8>(),
+                parts[3].parse::<f32>(),
+            ) {
+                return Color { r, g, b, a };
+            }
         }
     }
     Color::default()

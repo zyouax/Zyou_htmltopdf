@@ -13,7 +13,8 @@ struct LinkInfo {
 pub fn write_pdf(layout: &LayoutBox) -> Vec<u8> {
     let mut stream = Vec::new();
     let mut links = Vec::new();
-    write_box(layout, &mut stream, &mut links);
+    let mut alphas: Vec<(f32, String)> = Vec::new();
+    write_box(layout, &mut stream, &mut links, &mut alphas);
 
     let mut pdf = Vec::new();
     let mut offsets = Vec::new();
@@ -39,12 +40,27 @@ pub fn write_pdf(layout: &LayoutBox) -> Vec<u8> {
     );
 
     // Pages (3)
-    let annot_ids: Vec<String> = (0..links.len()).map(|i| format!("{} 0 R", 5 + i)).collect();
+    let ext_base = 5;
+    let annot_base = ext_base + alphas.len();
+    let annot_ids: Vec<String> = (0..links.len())
+        .map(|i| format!("{} 0 R", annot_base + i))
+        .collect();
     offsets.push(pdf.len());
-    pdf.extend(format!(
-        "3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >> /F3 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> /Contents {} 0 R /MediaBox [0 0 595 842]",
-        content_id
-    ).as_bytes());
+    pdf.extend(
+        format!(
+            "3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >> /F3 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >>"
+        )
+        .as_bytes(),
+    );
+    if !alphas.is_empty() {
+        let gs: Vec<String> = alphas
+            .iter()
+            .enumerate()
+            .map(|(i, (_, name))| format!("/{} {} 0 R", name, ext_base + i))
+            .collect();
+        pdf.extend(format!(" /ExtGState << {} >>", gs.join(" ")).as_bytes());
+    }
+    pdf.extend(format!(" >> /Contents {} 0 R /MediaBox [0 0 595 842]", content_id).as_bytes());
     if !annot_ids.is_empty() {
         pdf.extend(format!(" /Annots [{}]", annot_ids.join(" ")).as_bytes());
     }
@@ -55,9 +71,18 @@ pub fn write_pdf(layout: &LayoutBox) -> Vec<u8> {
     pdf.extend(format!("4 0 obj\n<< /Length {} >>\nstream\n", stream.len()).as_bytes());
     pdf.extend(&stream);
     pdf.extend(b"\nendstream\nendobj\n");
-    // Annotation objects starting at 5
+    // ExtGState objects
+    for (i, (alpha, _name)) in alphas.iter().enumerate() {
+        let id = ext_base + i;
+        offsets.push(pdf.len());
+        pdf.extend(
+            format!("{} 0 obj\n<< /Type /ExtGState /ca {} /CA {} >>\nendobj\n", id, *alpha, *alpha).as_bytes(),
+        );
+    }
+
+    // Annotation objects starting after ExtGState
     for (i, l) in links.iter().enumerate() {
-        let id = 5 + i;
+        let id = annot_base + i;
         offsets.push(pdf.len());
         pdf.extend(
             format!(
@@ -68,7 +93,7 @@ pub fn write_pdf(layout: &LayoutBox) -> Vec<u8> {
         );
     }
 
-    let obj_count = 5 + links.len();
+    let obj_count = annot_base + links.len();
 
     // Cross-reference
     let xref_offset = pdf.len();
@@ -89,9 +114,17 @@ pub fn write_pdf(layout: &LayoutBox) -> Vec<u8> {
     pdf
 }
 
-fn write_box(b: &LayoutBox, stream: &mut Vec<u8>, links: &mut Vec<LinkInfo>) {
+fn write_box(
+    b: &LayoutBox,
+    stream: &mut Vec<u8>,
+    links: &mut Vec<LinkInfo>,
+    alphas: &mut Vec<(f32, String)>,
+) {
     let y_rect = 842.0 - b.y - b.height;
     if let Some(bg) = &b.style.background {
+        if bg.a < 1.0 {
+            stream.extend(format!("/{} gs\n", ensure_alpha(bg.a, alphas)).as_bytes());
+        }
         stream.extend(
             format!(
                 "{} {} {} rg\n",
@@ -117,12 +150,15 @@ fn write_box(b: &LayoutBox, stream: &mut Vec<u8>, links: &mut Vec<LinkInfo>) {
     match &b.content {
         BoxContent::Text(text) => {
             let y = 842.0 - b.y - b.style.font_size;
-            let Color { r, g, b: b_ } = b.style.color;
+            let Color { r, g, b: b_, a } = b.style.color;
             let font = match b.style.font_family.as_deref() {
                 Some("Times") | Some("Times-Roman") | Some("Times New Roman") => "F2",
                 Some("Courier") => "F3",
                 _ => "F1",
             };
+            if a < 1.0 {
+                stream.extend(format!("/{} gs\n", ensure_alpha(a, alphas)).as_bytes());
+            }
             stream.extend(
                 format!(
                     "BT\n/{} {} Tf\n{} {} Td\n{} {} {} rg\n({}) Tj\nET\n",
@@ -160,10 +196,35 @@ fn write_box(b: &LayoutBox, stream: &mut Vec<u8>, links: &mut Vec<LinkInfo>) {
     }
 
     for child in &b.children {
-        write_box(child, stream, links);
+        write_box(child, stream, links, alphas);
     }
 }
 
 fn escape_text(text: &str) -> String {
-    text.replace("(", "\\(").replace(")", "\\)")
+    let mut out = String::new();
+    for ch in text.chars() {
+        let c = match ch {
+            '(' => "\\(".to_string(),
+            ')' => "\\)".to_string(),
+            '\\' => "\\\\".to_string(),
+            _ => {
+                if ch as u32 <= 0xFF {
+                    (ch as u8 as char).to_string()
+                } else {
+                    "?".to_string()
+                }
+            }
+        };
+        out.push_str(&c);
+    }
+    out
+}
+
+fn ensure_alpha(value: f32, map: &mut Vec<(f32, String)>) -> String {
+    if let Some((_, name)) = map.iter().find(|(v, _)| (*v - value).abs() < f32::EPSILON) {
+        return name.clone();
+    }
+    let name = format!("GS{}", map.len() + 1);
+    map.push((value, name.clone()));
+    name
 }
